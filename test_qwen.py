@@ -3,7 +3,7 @@
 Test script for Qwen2.5-VL-7B-Instruct vision-language model with metadata integration.
 """
 
-from transformers import Qwen2VLForConditionalGeneration, AutoTokenizer, AutoProcessor
+from transformers import AutoModelForVision2Seq, AutoProcessor, BitsAndBytesConfig
 from qwen_vl_utils import process_vision_info
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
@@ -109,18 +109,29 @@ def extract_image_metadata_for_prompt(image_path):
     except Exception as e:
         return f"Could not extract metadata: {str(e)}"
 
+def clear_gpu_memory():
+    """Clear GPU memory cache to free up space."""
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
+        torch.cuda.synchronize()
+
 def main():
     """Test the Qwen2.5-VL model with metadata-enhanced prompts."""
-    print("=== Qwen2.5-VL-7B-Instruct Test ===\n")
+    print("=== Qwen2.5-VL-3B-Instruct Test ===\n")
+    
+    # Clear any existing GPU memory
+    clear_gpu_memory()
     
     # Check if CUDA is available
     print(f"CUDA available: {torch.cuda.is_available()}")
     if torch.cuda.is_available():
         print(f"GPU: {torch.cuda.get_device_name()}")
-        print(f"GPU memory: {torch.cuda.get_device_properties(0).total_memory / 1024**3:.1f} GB")
+        gpu_total = torch.cuda.get_device_properties(0).total_memory / 1024**3
+        gpu_free = torch.cuda.mem_get_info()[0] / 1024**3
+        print(f"GPU memory: {gpu_total:.1f} GB total, {gpu_free:.1f} GB free")
     print()
     
-    model_id = "Qwen/Qwen2.5-VL-7B-Instruct"
+    model_id = "Qwen/Qwen2.5-VL-3B-Instruct"
     cache_dir = "/media/wenzhen/SSD1T/huggingface_models"
     image_path = "./data/IMG_1854.jpg"
     
@@ -132,14 +143,52 @@ def main():
         print(f"Loading Qwen2.5-VL model: {model_id}")
         print("This may take several minutes...")
         
-        # Load the model
-        model = Qwen2VLForConditionalGeneration.from_pretrained(
-            model_id,
-            torch_dtype=torch.bfloat16 if torch.cuda.is_available() else torch.float32,
-            device_map="auto" if torch.cuda.is_available() else "cpu",
-            cache_dir=cache_dir,
-            token=hf_token
-        )
+        # Load the model with aggressive memory optimization for RTX 2070
+        if torch.cuda.is_available():
+            gpu_free = torch.cuda.mem_get_info()[0] / 1024**3
+            gpu_total = torch.cuda.get_device_properties(0).total_memory / 1024**3
+            print(f"GPU memory available: {gpu_free:.1f} GB / {gpu_total:.1f} GB")
+            
+            # RTX 2070 with 7.8GB needs very aggressive optimization
+            if gpu_total < 10:  # RTX 2070 case
+                print("🔧 RTX 2070 detected: Using CPU inference for reliability")
+                print("💡 Vision models are very memory-intensive, CPU will be slower but stable")
+                quantization_config = None
+                device_map = "cpu"
+                torch_dtype = torch.float32
+                use_quantization = False
+            else:
+                print("✅ High-end GPU detected, using GPU with quantization")
+                quantization_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_compute_dtype=torch.float16,
+                    bnb_4bit_use_double_quant=True,
+                    bnb_4bit_quant_type="nf4"
+                )
+                device_map = "auto"
+                torch_dtype = None
+                use_quantization = True
+        else:
+            print("⚠️  No GPU available, using CPU inference")
+            quantization_config = None
+            device_map = "cpu"
+            torch_dtype = torch.float32
+            use_quantization = False
+        
+        # Load model with appropriate settings
+        model_kwargs = {
+            "cache_dir": cache_dir,
+            "token": hf_token,
+            "low_cpu_mem_usage": True,
+            "device_map": device_map
+        }
+        
+        if use_quantization:
+            model_kwargs["quantization_config"] = quantization_config
+        else:
+            model_kwargs["torch_dtype"] = torch_dtype
+            
+        model = AutoModelForVision2Seq.from_pretrained(model_id, **model_kwargs)
         
         # Load processor
         processor = AutoProcessor.from_pretrained(
@@ -149,7 +198,15 @@ def main():
         )
         
         print("✓ Model and processor loaded successfully")
-        print(f"Model device: {next(model.parameters()).device}")
+        if use_quantization:
+            print("📊 Model loaded with 4-bit quantization")
+        
+        # Get model device info
+        try:
+            device_info = next(model.parameters()).device
+            print(f"Model device: {device_info}")
+        except:
+            print("Model device: Distributed across multiple devices")
         
         # Extract metadata
         metadata_info = extract_image_metadata_for_prompt(image_path)
@@ -190,8 +247,9 @@ Describe this scene naturally, mentioning where and when it was taken, what's ha
             return_tensors="pt",
         )
         
-        # Move to device
-        inputs = inputs.to(model.device)
+        # Move to device if using GPU
+        if device_map != "cpu":
+            inputs = inputs.to(model.device)
         
         print("\n" + "="*60)
         print("PROMPT SENT TO MODEL:")

@@ -11,7 +11,7 @@ This is a Python project for testing and comparing vision-language models with m
 - **Python Version**: >=3.12,<3.14
 - **Package Manager**: Poetry
 - **Virtual Environment**: Configured to use in-project virtual environments (`.venv/`)
-- **Models Tested**: Google Gemma-3-4B-IT, Qwen2.5-VL-7B-Instruct
+- **Models Tested**: Google Gemma-3-4B-IT, Qwen2.5-VL-3B-Instruct
 
 ## Key Dependencies
 
@@ -30,7 +30,7 @@ This is a Python project for testing and comparing vision-language models with m
 # Test Gemma-3-4B-IT model
 poetry run python test_gemma.py
 
-# Test Qwen2.5-VL-7B-Instruct model
+# Test Qwen2.5-VL-3B-Instruct model
 poetry run python test_qwen.py
 
 # Compare both models side-by-side
@@ -68,7 +68,7 @@ poetry show
 
 ### Core Scripts
 - `test_gemma.py` - Test Gemma-3-4B-IT model with metadata integration
-- `test_qwen.py` - Test Qwen2.5-VL-7B-Instruct model with metadata integration
+- `test_qwen.py` - Test Qwen2.5-VL-3B-Instruct model with metadata integration
 - `compare_models.py` - Compare both models side-by-side
 - `convert_heic.py` - Convert HEIC files to JPEG with metadata preservation
 - `extract_metadata.py` - Extract comprehensive metadata from images
@@ -125,7 +125,7 @@ poetry show
 
 The project supports testing two different approaches:
 - **Gemma-3-4B-IT**: Text model with image support via chat templates
-- **Qwen2.5-VL-7B-Instruct**: Dedicated vision-language model
+- **Qwen2.5-VL-3B-Instruct**: Dedicated vision-language model with smart memory management
 
 Both models receive identical metadata-enhanced prompts for fair comparison.
 
@@ -138,8 +138,20 @@ HUGGINGFACE_TOKEN=your_huggingface_token_here
 
 ## Notes
 
-- Models require significant GPU memory (8GB+ recommended)
+### GPU Memory Requirements
+- **Gemma-3-4B-IT**: Works well on RTX 2070 (8GB)
+- **Qwen2.5-VL-3B-Instruct**: Auto-detects GPU capacity and falls back to CPU for RTX 2070
+- **High-end GPUs** (12GB+): Can run both models with quantization for optimal performance
+
+### Performance Tips
 - CPU inference is supported but significantly slower
+- RTX 2070 users: Gemma model recommended for GPU acceleration
 - First model download requires internet connection and time
 - HEIC files require `pillow-heif` for processing
 - Metadata extraction works with most JPEG/HEIC files with EXIF data
+
+### Memory Management
+- Automatic GPU memory detection and clearing
+- Smart fallback to CPU when GPU memory insufficient
+- 4-bit/8-bit quantization support for high-memory GPUs
+- `bitsandbytes` integration for memory optimization
