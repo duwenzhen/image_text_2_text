@@ -1,0 +1,22 @@
+[tool.poetry]
+name = "image-text-2-text"
+version = "0.1.0"
+description = ""
+authors = ["wenzhen <wenzhen.du@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.12,<3.14"
+transformers = "^4.56.1"
+torch = "^2.8.0"
+torchvision = "^0.23.0"
+pillow = "^11.3.0"
+python-dotenv = "^1.0.0"
+accelerate = "^1.10.1"
+pillow-heif = "^1.1.0"
+qwen-vl-utils = "^0.0.11"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
