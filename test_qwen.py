@@ -119,6 +119,9 @@ def main():
     """Test the Qwen2.5-VL model with metadata-enhanced prompts."""
     print("=== Qwen2.5-VL-3B-Instruct Test ===\n")
     
+    # Set PyTorch memory allocator for fragmentation handling
+    os.environ['PYTORCH_CUDA_ALLOC_CONF'] = 'expandable_segments:True'
+    
     # Clear any existing GPU memory
     clear_gpu_memory()
     
@@ -134,10 +137,33 @@ def main():
     model_id = "Qwen/Qwen2.5-VL-3B-Instruct"
     cache_dir = "/media/wenzhen/SSD1T/huggingface_models"
     image_path = "./data/IMG_1854.jpg"
+    resized_image_path = "./data/resized.jpg"
     
     if not os.path.exists(image_path):
         print(f"Image file not found: {image_path}")
         return
+    
+    # Check if image needs resizing to reduce memory usage
+    with Image.open(image_path) as img:
+        width, height = img.size
+        max_pixels = width * height
+        
+        # Only resize if image is larger than 2M pixels (roughly 1600x1200)
+        if max_pixels > 2_000_000:
+            print(f"Image is large ({width}x{height} = {max_pixels:,} pixels), resizing to reduce memory usage...")
+            # Resize to quarter dimensions to reduce memory by ~87.5%
+            resized_img = img.reduce(4).convert('RGB')
+            
+            # Preserve EXIF metadata
+            exif_data = img.info.get('exif')
+            if exif_data:
+                resized_img.save(resized_image_path, quality=90, exif=exif_data)
+            else:
+                resized_img.save(resized_image_path, quality=90)
+            print(f"Image resized from {img.size} to {resized_img.size} (metadata preserved)")
+            image_path = resized_image_path
+        else:
+            print(f"Image is already small ({width}x{height} = {max_pixels:,} pixels), no resizing needed")
     
     try:
         print(f"Loading Qwen2.5-VL model: {model_id}")
@@ -149,14 +175,19 @@ def main():
             gpu_total = torch.cuda.get_device_properties(0).total_memory / 1024**3
             print(f"GPU memory available: {gpu_free:.1f} GB / {gpu_total:.1f} GB")
             
-            # RTX 2070 with 7.8GB needs very aggressive optimization
+            # RTX 2070 with 7.8GB - try INT4 quantization for GPU usage
             if gpu_total < 10:  # RTX 2070 case
-                print("🔧 RTX 2070 detected: Using CPU inference for reliability")
-                print("💡 Vision models are very memory-intensive, CPU will be slower but stable")
-                quantization_config = None
-                device_map = "cpu"
-                torch_dtype = torch.float32
-                use_quantization = False
+                print("🔧 RTX 2070 detected: Using INT4 quantization with resized image")
+                print("💡 INT4 quantization + smaller image should reduce memory usage")
+                quantization_config = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_compute_dtype=torch.float16,
+                    bnb_4bit_use_double_quant=True,
+                    bnb_4bit_quant_type="nf4"
+                )
+                device_map = "auto"
+                torch_dtype = None
+                use_quantization = True
             else:
                 print("✅ High-end GPU detected, using GPU with quantization")
                 quantization_config = BitsAndBytesConfig(
@@ -213,12 +244,60 @@ def main():
         print(f"Metadata extracted: {metadata_info}")
         
         # Create enhanced prompt
-        enhanced_prompt = f"""Please describe this image as if you were telling someone about a memorable photo. Combine what you can see in the image with the context provided to create a natural, flowing description. 
+#         enhanced_prompt = f"""Please describe this image as if you were telling someone about a memorable photo. Combine what you can see in the image with the context provided to create a natural, flowing description.
+#
+# Context: {metadata_info}
+#
+# Describe this scene naturally, mentioning what's happening in the image, and paint a picture that brings this moment to life. Be detailed and descriptive, but write it as a human would naturally describe a photo to a friend. Don't focus on technical details - instead tell the story of this moment by integrating the time and location."""
+#
+        enhanced_prompt = f"""
+        AI Prompt Template for Image Description Generation
+Role Definition:
+You are an expert image analyst and descriptive cataloger. Your primary function is to transform visual information and technical metadata into rich, detailed, and natural language narratives suitable for high-quality semantic search within a vector database.
 
-Context: {metadata_info}
+Core Objective:
+Analyze the provided image and its accompanying metadata. Generate a comprehensive, precise description of the image that seamlessly integrates relevant contextual information from the metadata. The final description must be in natural, flowing prose, avoiding lists or technical jargon in the final output.
 
-Describe this scene naturally, mentioning where and when it was taken, what's happening in the image, and paint a picture that brings this moment to life. Be detailed and descriptive, but write it as a human would naturally describe a photo to a friend. Don't focus on technical details - instead tell the story of this moment."""
-        
+Input Data:
+
+Image: {image_path}
+
+Metadata: {metadata_info}
+
+Processing Instructions:
+
+1. Primary Visual Analysis (Content and Composition):
+
+Subject Identification: Identify all primary and secondary subjects (e.g., people, animals, objects). Describe their specific attributes, appearance, posture, expressions, and any actions they are performing.
+
+Environmental Context: Detail the setting and environment. Include information on location (e.g., urban street, forest interior, beach), weather conditions, and time of day (e.g., bright midday sun, twilight, overcast).
+
+Composition and Perspective: Describe the camera's perspective (e.g., eye-level, low-angle shot, aerial view) and the arrangement of elements within the frame. Note significant foreground and background details.
+
+2. Metadata Interpretation and Integration:
+
+Relevance Assessment: Critically evaluate the provided metadata. Determine which elements add meaningful context to the visual description (e.g., specific date, location name, time of day).
+
+Natural Integration: Weave the relevant metadata naturally into the descriptive narrative.
+
+Example 1 (Location): Instead of writing "Metadata location: Paris," integrate it as: "The scene captures a bustling Parisian street corner..."
+
+Example 2 (Time): If the timestamp indicates evening and the image confirms it, describe it as: "As evening approaches, the city lights begin to cast long shadows..."
+
+Example 3 (Technical Interpretation): Do not list "Aperture f/1.8." Instead, describe the effect: "The low aperture setting creates a soft, blurred background (bokeh), drawing sharp focus to the subject's face."
+
+3. Output Generation (Style and Format):
+
+Tone: Objective, descriptive, and highly detailed.
+
+Language: Natural human language, written in complete sentences and paragraphs.
+
+Exclusions: Do not include a separate list of metadata keys and values in the final output. Omit technical metadata entirely if it provides no interpretable value to the visual description (e.g., camera serial number or software version). The goal is a purely narrative description.
+
+Final Output Request:
+
+Provide a single, coherent descriptive paragraph based on the analysis above.
+        """
         # Prepare messages in Qwen format
         messages = [
             {
@@ -258,14 +337,16 @@ Describe this scene naturally, mentioning where and when it was taken, what's ha
         print("="*60)
         print("\nGenerating response...\n")
         
-        # Generate response
+        # Generate response with memory-efficient settings
         with torch.no_grad():
             generated_ids = model.generate(
                 **inputs,
-                max_new_tokens=1000,
+                max_new_tokens=500,  # Reduce to save memory
                 temperature=0.7,
                 do_sample=True,
-                top_p=0.95
+                top_p=0.95,
+                use_cache=True,  # Use KV cache efficiently
+                pad_token_id=processor.tokenizer.eos_token_id
             )
         
         generated_ids_trimmed = [

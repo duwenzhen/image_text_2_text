@@ -139,19 +139,24 @@ HUGGINGFACE_TOKEN=your_huggingface_token_here
 ## Notes
 
 ### GPU Memory Requirements
-- **Gemma-3-4B-IT**: Works well on RTX 2070 (8GB)
-- **Qwen2.5-VL-3B-Instruct**: Auto-detects GPU capacity and falls back to CPU for RTX 2070
+- **Gemma-3-4B-IT**: Works well on RTX 2070 (8GB) with full GPU acceleration
+- **Qwen2.5-VL-3B-Instruct**: Successfully runs on RTX 2070 with INT4 quantization + image resizing
 - **High-end GPUs** (12GB+): Can run both models with quantization for optimal performance
 
 ### Performance Tips
+- **RTX 2070 Users**: Both models now work on GPU with optimization
+  - Gemma: Direct GPU acceleration, fastest performance
+  - Qwen: INT4 quantization + automatic image resizing for memory efficiency
 - CPU inference is supported but significantly slower
-- RTX 2070 users: Gemma model recommended for GPU acceleration
 - First model download requires internet connection and time
+- Large images (>2M pixels) are automatically resized to fit GPU memory
 - HEIC files require `pillow-heif` for processing
 - Metadata extraction works with most JPEG/HEIC files with EXIF data
 
 ### Memory Management
+- **Smart Image Resizing**: Automatically reduces large images while preserving EXIF metadata
+- **INT4 Quantization**: Reduces Qwen model memory usage to ~3-4GB on RTX 2070
 - Automatic GPU memory detection and clearing
-- Smart fallback to CPU when GPU memory insufficient
-- 4-bit/8-bit quantization support for high-memory GPUs
+- PyTorch memory allocator optimization (`expandable_segments:True`)
 - `bitsandbytes` integration for memory optimization
+- Intelligent fallback strategies for different GPU configurations

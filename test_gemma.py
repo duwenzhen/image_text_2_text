@@ -159,11 +159,54 @@ processor = AutoProcessor.from_pretrained(model_id, cache_dir="/media/wenzhen/SS
     token=hf_token)
 
 # Create enhanced prompt with metadata
-enhanced_prompt = f"""Please describe this image as if you were telling someone about a memorable photo. Combine what you can see in the image with the context from the metadata to create a natural, flowing description. Don't focus on technical camera settings - instead, weave together the visual content with the time, location, and context to tell the story of this moment.
+enhanced_prompt = f"""
+        AI Prompt Template for Image Description Generation
+Role Definition:
+You are an expert image analyst and descriptive cataloger. Your primary function is to transform visual information and technical metadata into rich, detailed, and natural language narratives suitable for high-quality semantic search within a vector database.
 
-{metadata_info}
+Core Objective:
+Analyze the provided image and its accompanying metadata. Generate a comprehensive, precise description of the image that seamlessly integrates relevant contextual information from the metadata. The final description must be in natural, flowing prose, avoiding lists or technical jargon in the final output.
 
-Describe this scene naturally, mentioning where and when it was taken, what's happening in the image, and paint a picture that brings this moment to life. Be detailed and descriptive, but write it as a human would naturally describe a photo to a friend."""
+Input Data:
+
+Image: {image_path}
+
+Metadata: {metadata_info}
+
+Processing Instructions:
+
+1. Primary Visual Analysis (Content and Composition):
+
+Subject Identification: Identify all primary and secondary subjects (e.g., people, animals, objects). Describe their specific attributes, appearance, posture, expressions, and any actions they are performing.
+
+Environmental Context: Detail the setting and environment. Include information on location (e.g., urban street, forest interior, beach), weather conditions, and time of day (e.g., bright midday sun, twilight, overcast).
+
+Composition and Perspective: Describe the camera's perspective (e.g., eye-level, low-angle shot, aerial view) and the arrangement of elements within the frame. Note significant foreground and background details.
+
+2. Metadata Interpretation and Integration:
+
+Relevance Assessment: Critically evaluate the provided metadata. Determine which elements add meaningful context to the visual description (e.g., specific date, location name, time of day).
+
+Natural Integration: Weave the relevant metadata naturally into the descriptive narrative.
+
+Example 1 (Location): Instead of writing "Metadata location: Paris," integrate it as: "The scene captures a bustling Parisian street corner..."
+
+Example 2 (Time): If the timestamp indicates evening and the image confirms it, describe it as: "As evening approaches, the city lights begin to cast long shadows..."
+
+Example 3 (Technical Interpretation): Do not list "Aperture f/1.8." Instead, describe the effect: "The low aperture setting creates a soft, blurred background (bokeh), drawing sharp focus to the subject's face."
+
+3. Output Generation (Style and Format):
+
+Tone: Objective, descriptive, and highly detailed.
+
+Language: Natural human language, written in complete sentences and paragraphs.
+
+Exclusions: Do not include a separate list of metadata keys and values in the final output. Omit technical metadata entirely if it provides no interpretable value to the visual description (e.g., camera serial number or software version). The goal is a purely narrative description.
+
+Final Output Request:
+
+Provide a single, coherent descriptive paragraph based on the analysis above.
+        """
 
 messages = [
     {
