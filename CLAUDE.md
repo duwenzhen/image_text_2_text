@@ -22,6 +22,10 @@ This is a Python project for testing and comparing vision-language models with m
 - **qwen-vl-utils**: Utilities for Qwen vision models
 - **accelerate**: Multi-GPU and optimization support
 - **python-dotenv**: Environment variable management
+- **piexif**: EXIF metadata writing and editing
+- **numpy**: Array operations and batch processing
+- **opencv-python**: Video frame extraction and processing (NEW!)
+- **pymediainfo**: Video metadata extraction (optional, fallback available)
 
 ## Common Commands
 
@@ -44,6 +48,24 @@ poetry run python convert_heic.py
 
 # Extract comprehensive metadata from images
 poetry run python extract_metadata.py
+
+# Convert HEIC/MOV/MP4 files to JPEG with metadata preservation (NEW!)
+poetry run python convert_media.py
+```
+
+### Batch Photo Processing
+```bash
+# Process thousands of photos with AI descriptions (Simple version)
+poetry run python simple_batch_processor.py /path/to/photos
+
+# Process with advanced optimizations (memory management, progress tracking)
+poetry run python batch_process_photos.py /path/to/photos
+
+# Run interactive demo
+poetry run python demo_batch.py
+
+# Organize photos by camera type from zip files (with auto-conversion)
+poetry run python organize_by_camera.py /path/to/zip/folder
 ```
 
 ### Poetry Commands
@@ -72,6 +94,13 @@ poetry show
 - `compare_models.py` - Compare both models side-by-side
 - `convert_heic.py` - Convert HEIC files to JPEG with metadata preservation
 - `extract_metadata.py` - Extract comprehensive metadata from images
+- `convert_media.py` - **NEW!** Convert HEIC/MOV/MP4 to JPEG with metadata preservation
+
+### Batch Processing Scripts
+- `simple_batch_processor.py` - Simple batch processor for thousands of photos
+- `batch_process_photos.py` - Advanced batch processor with optimizations
+- `demo_batch.py` - Interactive demo and testing script
+- `organize_by_camera.py` - **UPDATED!** Organize photos by camera from ZIP files with auto-conversion
 
 ### Configuration
 - `pyproject.toml` - Poetry configuration and project metadata
@@ -110,16 +139,35 @@ poetry show
 - Includes camera information (make, model, settings)
 - Creates context-aware prompts for AI models
 
-### HEIC Support
-- Converts Apple HEIC format to JPEG
-- Preserves all metadata during conversion
-- Exports detailed metadata to JSON files
+### Multi-Format Media Support
+- **HEIC Support**: Converts Apple HEIC format to JPEG with metadata preservation
+- **Video Support (NEW!)**: Extracts frames from MOV/MP4 (iPhone Live Photos) to JPEG
+- **Smart Conversion**: Automatically detects and converts HEIC/MOV/MP4 files
+- **Space Optimization**: Deletes large originals after successful conversion
+- **Metadata Preservation**: GPS, timestamps, camera info preserved across formats
 
 ### Natural Language Descriptions
 - Generates storytelling-style descriptions
 - Combines visual analysis with metadata context
 - Avoids technical jargon, focuses on human-readable narratives
 - Supports up to 1000 tokens for detailed descriptions
+
+### Batch Processing for Thousands of Photos
+- **Simple Processor**: Load model once, process many images sequentially
+- **Advanced Processor**: Memory optimization, batch inference, parallel pipeline
+- **EXIF Integration**: Writes AI descriptions directly to original image metadata
+- **Memory Management**: Smart image resizing, temp files in memory only
+- **Progress Tracking**: SQLite database, resume capability, real-time ETA
+- **Quality Control**: Description validation, automatic retry for poor quality
+- **Performance**: 4-6 hours for thousands of photos on RTX 2070
+
+### Photo Organization by Camera
+- **ZIP Processing**: Extract and organize photos from multiple ZIP archives
+- **Camera Detection**: Automatically identifies camera make/model from EXIF data
+- **Auto-Conversion**: Converts HEIC/MOV/MP4 to space-efficient JPEG format
+- **Folder Organization**: Creates camera-specific folders (e.g., "Canon EOS R5", "iPhone 13 Pro")
+- **Metadata Preservation**: Saves detailed metadata alongside organized photos
+- **Space Savings**: 90%+ space reduction by converting videos to key frames
 
 ## Model Comparison
 
@@ -151,7 +199,9 @@ HUGGINGFACE_TOKEN=your_huggingface_token_here
 - First model download requires internet connection and time
 - Large images (>2M pixels) are automatically resized to fit GPU memory
 - HEIC files require `pillow-heif` for processing
-- Metadata extraction works with most JPEG/HEIC files with EXIF data
+- MOV/MP4 processing requires `opencv-python` for frame extraction
+- Video metadata extraction uses `ffprobe` when available (graceful fallback without it)
+- Metadata extraction works with most JPEG/HEIC/MOV/MP4 files with EXIF data
 
 ### Memory Management
 - **Smart Image Resizing**: Automatically reduces large images while preserving EXIF metadata
